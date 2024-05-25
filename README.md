@@ -1,4 +1,4 @@
 # setup
 Setup inicial de servidores
 
-curl -sL https://raw.githubusercontent.com/example-user/example-repo/main/scripts/install.sh | sudo bash
+curl -sL https://github.com/checchia/setup/blob/main/setup.sh | sudo bash
