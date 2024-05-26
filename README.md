@@ -11,6 +11,10 @@ O script executa algumas tarefas para preparar o ambiente:
 - [x] Ajustar as configurações de IPv6 (abaixo)
 - [x] Incluir checagem de pacotes para atualizar
 - [x] Incluir checagem de Security Updates 
+- [ ] Configurar tempo de inatividade e desconexão
+- [ ] Configurar duração de senha
+- [ ] configurar senha forte
+
 
 ## TODO
 - [x] Desenvolver o código Python

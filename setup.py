@@ -34,39 +34,8 @@ red_bold_blink="\\033[1;5;31m"
 bold="\\033[1m"
 reset="\\033[0m"
 
-# Imprimir os caracteres em amarelo e negrito
-echo -e "${yellow_bold}    ____ _                   _     _         _   _ _____ _____ "
-echo -e "${yellow_bold}   / ___| |__   ___  ___ ___| |__ (_) __ _  | \\ | | ____|_   _|"
-echo -e "${yellow_bold}  | |   | '_ \\ / _ \\/ __/ __| '_ \\| |/ _\\` | |  \\| |  _|   | |  "
-echo -e "${yellow_bold}  | |___| | | |  __/ (_| (__| | | | | (_| |_| |\\  | |___  | |  "
-echo -e "${yellow_bold}   \\____|_| |_|\\___|\\___\\___|_| |_|_|\\__,_(_)_| \\_|_____| |_|  "
-echo -e "${yellow_bold} "
-echo -e "${yellow_bold} "
+/usr/bin/neofetch
 
-# Exibir o último login
-last_login=$(lastlog -u $USER | tail -n 1)
-echo -e "${reset}${bold}Último login:${reset} $last_login"
-
-# Exibir a data e hora atual
-current_datetime=$(date)
-echo -e "${bold}Data e hora atual:${reset} $current_datetime"
-
-# Exibir o espaço livre e total na partição root
-root_space=$(df -h / | awk 'NR==2 {print $4 " livre de " $2}')
-echo -e "${bold}Espaço na partição root:${reset} $root_space"
-
-# Verificar se a partição /DADOS existe e exibir o espaço livre e total
-if mountpoint -q /DADOS; then
-  dados_space=$(df -h /DADOS | awk 'NR==2 {print $4 " livre de " $2}')
-  echo -e "${bold}Espaço na partição /DADOS:${reset} $dados_space"
-else
-  echo -e "${red_bold}A partição /DADOS não existe.${reset}"
-fi
-
-
-echo " "
-echo " "
-echo " "
 
 
 # Mensagem sobre acesso não autorizado
@@ -77,15 +46,11 @@ echo -e "Qualquer atividade não autorizada será ${red_bold}monitorada e regist
 echo -e "Usuários que tentarem acessar o sistema sem autorização estarão sujeitos a ${bold}penalidades severas${reset} conforme as leis vigentes."
 
 echo " "
-echo " "
-echo " "
 
 # Verificar se o usuário logado é root ou possui privilégios sudoers
 if [ "$EUID" -eq 0 ]; then
   echo -e "${red_bold}VOCÊ ESTÁ ACESSANDO COMO USUÁRIO PRIVILEGIADO!${reset}"
   echo -e "${red_bold_blink}\"Com grandes poderes vêm grandes responsabilidades! Não se esqueça!\"${reset}"
-  echo " "
-  echo " "
   echo " "
 
   # Verificar quantos pacotes precisam ser atualizados
@@ -107,7 +72,6 @@ else
   echo " "
 fi
 echo " "
-
 """
 
 file_path = "/etc/profile.d/00-banner.sh"
@@ -144,7 +108,18 @@ def status(mensagem, codigo):
     print(f"{mensagem.ljust(80-len(status))}{status}")
 
 def install_packages():
-    packages = ['net-tools','vim','python3-pip','python-is-python3','rsyslog','screen','auditd','figlet','inetutils-traceroute','whois']
+    packages = ['ufw','neofetch','net-tools','vim','python3-pip','python-is-python3','rsyslog','screen','auditd','figlet','inetutils-traceroute','whois']
+    try:
+        subprocess.run(['sudo', 'apt', 'update', '-y'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        status("Rodando apt update!",0)
+    except subprocess.CalledProcessError as e:
+        status("Erro ao rodar apt update",1)
+    try:
+        subprocess.run(['sudo', 'apt', 'dist-upgrade', '-y'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        status("Atualização de pacotes",0)
+    except subprocess.CalledProcessError as e:
+        status("Erro atualizando os pacotes",1)
+
     try:
         for package in packages:
             subprocess.run(['sudo', 'apt', 'install', '-y', package], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -270,7 +245,6 @@ if __name__ == "__main__":
     checkversion()
     disable_ipv6()
     check_and_update_rc_local()
-    configure_ufw_for_ssh()
     try:
         with open(file_path, "w") as file:
             file.write(banner_content)
@@ -278,6 +252,7 @@ if __name__ == "__main__":
     except PermissionError:
         status(f"Você não tem permissões para escrever em {file_path}. Execute o script como superusuário (root) ou com permissões de escrita adequadas.",1)
     install_packages()
+    configure_ufw_for_ssh()
     enable_auditd()
     start_auditd()
     configure_audit_rules()
