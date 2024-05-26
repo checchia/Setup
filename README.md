@@ -25,7 +25,7 @@ O script executa algumas tarefas para preparar o ambiente:
 - [ ] Criar conta gratuíta no Mailgun para checchia.net e para taya.sh
 - [ ] Criar rotina para baixar o log de disparos de e-mail do mailgun (conta free = log retention 1 dia)
 
-
+UPS
 
 sudo nano /etc/ssh/sshd_config
 
