@@ -19,6 +19,11 @@ if os.geteuid() != 0:
     print("Este script precisa ser executado como root.")
     sys.exit(1)
 
+bash_shebang = '#!/bin/bash'
+rc_local_path = '/etc/rc.local'
+required_line = '/etc/init.d/procps restart'
+exit_line = 'exit 0'
+
 banner_content = """#!/bin/bash
 clear
 
@@ -57,12 +62,17 @@ if mountpoint -q /DADOS; then
 else
   echo -e "${red_bold}A partição /DADOS não existe.${reset}"
 fi
+
+
 echo " "
 echo " "
 echo " "
 
+
 # Mensagem sobre acesso não autorizado
-echo -e "${red_bold}AVISO DE SEGURANÇA:${reset} ${bold}O acesso não autorizado a este sistema é proibido.${reset}"
+echo -e "${red_bold}      A V I S O   D E   S E G U R A N Ç A!!!${reset} "
+echo " "
+echo -e "${bold}O acesso não autorizado a este sistema é proibido.${reset}"
 echo -e "Qualquer atividade não autorizada será ${red_bold}monitorada e registrada${reset} e pode resultar em ${red_bold}processos criminais${reset}."
 echo -e "Usuários que tentarem acessar o sistema sem autorização estarão sujeitos a ${bold}penalidades severas${reset} conforme as leis vigentes."
 
@@ -74,10 +84,30 @@ echo " "
 if [ "$EUID" -eq 0 ]; then
   echo -e "${red_bold}VOCÊ ESTÁ ACESSANDO COMO USUÁRIO PRIVILEGIADO!${reset}"
   echo -e "${red_bold_blink}\"Com grandes poderes vêm grandes responsabilidades! Não se esqueça!\"${reset}"
+  echo " "
+  echo " "
+  echo " "
+
+  # Verificar quantos pacotes precisam ser atualizados
+  updates_count=$(apt list --upgradable 2>/dev/null | grep -c upgradable)
+
+  # Verificar quantos pacotes de segurança precisam ser atualizados
+  security_updates_count=$(apt list --upgradable 2>/dev/null | grep -c "security")
+
+  # Exibir a quantidade de pacotes a serem atualizados, se maior que zero
+  if [ $updates_count -gt 0 ]; then
+    echo -e "${red_bold}Pacotes que precisam ser atualizados: ${updates_count}${reset}"
+  fi
+
+  # Exibir a quantidade de pacotes de segurança a serem atualizados, se maior que zero
+  if [ $security_updates_count -gt 0 ]; then
+    echo -e "${red_bold}Pacotes de segurança que precisam ser atualizados: ${security_updates_count}${reset}"
+  fi
+else
+  echo " "
 fi
 echo " "
-echo " "
-echo " "
+
 """
 
 file_path = "/etc/profile.d/00-banner.sh"
@@ -89,7 +119,7 @@ def disable_ipv6():
             # Adicionar a configuração para desativar o IPv6
             sysctl_file.write('net.ipv6.conf.all.disable_ipv6 = 1\n')
             sysctl_file.write('net.ipv6.conf.default.disable_ipv6 = 1\n')
-        
+            sysctl_file.write('net.ipv6.conf.lo.disable_ipv6 = 1\n')    
         # Recarregar as configurações do sysctl
         subprocess.run(['sudo', 'sysctl', '-p'], stdout=subprocess.DEVNULL)
         
@@ -114,7 +144,7 @@ def status(mensagem, codigo):
     print(f"{mensagem.ljust(80-len(status))}{status}")
 
 def install_packages():
-    packages = ['net-tools', 'vim', 'python-is-python3', 'rsyslog', 'screen', 'auditd']
+    packages = ['net-tools','vim','python3-pip','python-is-python3','rsyslog','screen','auditd','figlet','inetutils-traceroute','whois']
     try:
         for package in packages:
             subprocess.run(['sudo', 'apt', 'install', '-y', package], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -161,9 +191,86 @@ def configure_audit_rules():
     except:
         status("Erro na reinicialização do serviço auditd!",1)
 
+def check_and_update_rc_local():
+    # Verificar se o arquivo rc.local existe
+    if not os.path.exists(rc_local_path):
+        # Criar o arquivo com o conteúdo necessário
+        with open(rc_local_path, 'w') as file:
+            file.write(f'{bash_shebang}\n')
+            file.write('# /etc/rc.local\n')
+            file.write('# Load kernel variables from /etc/sysctl.d\n')
+            file.write(f'{required_line}\n')
+            file.write(f'{exit_line}\n')
+        # Tornar o arquivo executável
+        os.chmod(rc_local_path, 0o755)
+        status(f'Arquivo {rc_local_path} criado com sucesso.',0)
+    else:
+        # Ler o conteúdo atual do arquivo
+        with open(rc_local_path, 'r') as file:
+            lines = file.readlines()
+
+        # Remover novas linhas e espaços extras das linhas
+        lines = [line.strip() for line in lines]
+
+        # Garantir que a primeira linha é o shebang correto
+        if not lines or lines[0] != bash_shebang:
+            lines.insert(0, bash_shebang)
+            status(f'Shebang "{bash_shebang}" adicionado ao início do arquivo.',0)
+
+        # Verificar se a linha necessária está presente
+        if required_line not in lines:
+            # Inserir a linha necessária antes do exit 0
+            new_lines = []
+            exit_found = False
+            for line in lines:
+                if line == exit_line:
+                    new_lines.append(required_line)
+                    exit_found = True
+                new_lines.append(line)
+            if not exit_found:
+                new_lines.append(required_line)
+            lines = new_lines
+            status(f'Linha "{required_line}" adicionada ao arquivo.',0)
+        else:
+            status(f'A linha "{required_line}" já está presente no arquivo.',0)
+
+        # Verificar se a linha 'exit 0' existe
+        if exit_line not in lines:
+            # Adicionar 'exit 0' como última linha se não existir
+            lines.append(exit_line)
+            status(f'Linha "{exit_line}" adicionada ao final do arquivo.',0)
+        else:
+            status(f'A linha "{exit_line}" já está presente no arquivo.',0)
+
+        # Escrever as linhas atualizadas de volta para o arquivo
+        with open(rc_local_path, 'w') as file:
+            for line in lines:
+                file.write(line + '\n')
+
+    try:
+        subprocess.run(["sudo", "chmod", "755", "/etc/rc.local"], stdout=subprocess.DEVNULL)
+        status("Executando chmod para execução /etc/rc.local.",0)
+    except:
+        status("Erro executando chmod /etc/rc.local",1)
+
+def configure_ufw_for_ssh():
+    try:
+        # Permitir o acesso à porta 22 (SSH)
+        subprocess.run(['sudo', 'ufw', 'allow', '22'], check=True, stdout=subprocess.DEVNULL)
+        status("Porta 22 liberada com sucesso.",0)
+        
+        # Habilitar o UFW
+        subprocess.run(['sudo', 'ufw', '--force', 'enable'], check=True, stdout=subprocess.DEVNULL)
+        status("UFW habilitado com sucesso.",0)
+        
+    except subprocess.CalledProcessError as e:
+        status(f"Ocorreu um erro ao configurar o UFW!!!",1)
+
 if __name__ == "__main__":
     checkversion()
     disable_ipv6()
+    check_and_update_rc_local()
+    configure_ufw_for_ssh()
     try:
         with open(file_path, "w") as file:
             file.write(banner_content)

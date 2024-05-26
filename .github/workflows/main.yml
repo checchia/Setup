@@ -1,0 +1,37 @@
+name: Build e upload binário setup
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Configurar Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'  # Escolha a versão do Python que você precisa
+
+    - name: Instalar Nuitka
+      run: |
+        python -m pip install --upgrade pip
+        pip install nuitka
+
+    - name: Compilar script Python com Nuitka
+      run: |
+        nuitka --standalone --onefile --output-dir=dist meu_script.py
+
+    - name: Salvar artefatos
+      uses: actions/upload-artifact@v2
+      with:
+        name: binario-compilado
+        path: dist/
